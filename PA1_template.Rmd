@@ -1,0 +1,105 @@
+======================================
+
+#title: "IndividualAtivityAnalysis.Rmd"
+#author: "M Dugda"
+#date: "Saturday, June 04, 2016"
+#output: html_document
+===================================
+
+Creating Dirctory, downloading and unzipping data
+======================================
+```{r echo=TRUE} 
+Url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip" 
+if (!file.exists("data")) dir.create("data")
+if (!file.exists("data/data.zip")) download.file(url, destfile = "data/data.zip", mode="wb")
+if (!file.exists("data/activity.csv")) unzip("data/data.zip", exdir="data")
+```
+
+#Load the data and check its structure and summary
+```{r echo =TRUE}
+activity <- read.csv("data/activity.csv",quote="\"")
+str(activity)
+head(activity)
+summary(activity)
+activity$date <- as.Date(activity$date)
+activity_ign <- subset(activity, !is.na(activity$steps))
+```
+
+#What is mean total number of steps taken per day?
+```{r}
+dailysum <- tapply(activity_ign$steps, activity_ign$date, sum, na.rm=TRUE, simplify=T)
+dailysum <- dailysum[!is.na(dailysum)]
+
+hist(x=dailysum,
+     col="blue",
+     breaks=20,
+     xlab="Daily total steps",
+     ylab="Frequency",
+     main="The distribution of daily total")
+mean(dailysum)
+median(dailysum)
+```
+
+#What is the average daily activity pattern?
+```{r}
+int_avg <- tapply(activity_ign$steps, activity_ign$interval, mean, na.rm=TRUE, simplify=T)
+activity_ia <- data.frame(interval=as.integer(names(int_avg)), avg=int_avg)
+
+with(activity_ia,
+     plot(interval,
+          avg,
+          type="l",
+          xlab="5-minute intervals",
+          ylab="average steps in the interval across all days"))
+```
+
+#Imputing missing values
+```{r echo=TRUE} 
+activity_impute <- activity
+ndx <- is.na(activity_impute$steps)
+int_avg <- tapply(activity_ign$steps, activity_ign$interval, mean, na.rm=TRUE, simplify=T)
+activity_impute$steps[ndx] <- int_avg[as.character(activity_impute$interval[ndx])]
+
+new_dailysum <- tapply(activity_impute$steps, activity_impute$date, sum, na.rm=TRUE, simplify=T)
+
+hist(x=new_dailysum,
+     col="green",
+     breaks=20,
+     xlab="daily steps",
+     ylab="frequency",
+     main="The distribution of daily total (with missing data imputed)")
+     
+mean(new_dailysum)
+
+median(new_dailysum)
+```
+
+Are there differences in activity patterns between weekdays and weekends?
+
+# helper function to decide if a day is a week day or not
+```{r check if day is a weekday, echo=TRUE} 
+is_weekday <- function(d) {
+    wd <- weekdays(d)
+    ifelse (wd == "Saturday" | wd == "Sunday", "weekend", "weekday")
+}
+
+wx <- sapply(activity_impute$date, is_weekday)
+activity_impute$wk <- as.factor(wx)
+head(activity_impute)
+```
+
+#make a panel plot containing a time series plot
+
+```{r echo=TRUE}
+wk_activity <- aggregate(steps ~ wk+interval, data=activity_impute, FUN=mean)
+library(lattice)
+xyplot(steps ~ interval | factor(wk),
+       layout = c(1, 2),
+       xlab="Interval",
+       ylab="Number of steps",
+       type="l",
+       lty=1,
+       data=wk_activity)
+```
+
+# The END of the Rmd Code
